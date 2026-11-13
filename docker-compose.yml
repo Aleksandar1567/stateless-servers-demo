@@ -1,0 +1,17 @@
+# Runs the demo with a real Redis as the shared store.
+#   docker compose up --build
+#   open http://localhost:3000
+services:
+  redis:
+    image: redis:7-alpine
+
+  demo:
+    build: .
+    environment:
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "3000:3000" # dashboard
+      - "8080:8080" # stateful cluster load balancer
+      - "8081:8081" # stateless cluster load balancer
+    depends_on:
+      - redis

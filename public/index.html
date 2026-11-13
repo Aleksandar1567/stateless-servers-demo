@@ -1,0 +1,638 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stateless Servers Demo</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f4f5f7;
+    --surface: #ffffff;
+    --surface-2: #f2f4f7;
+    --text: #161a22;
+    --muted: #5b6472;
+    --border: #dde1e7;
+    --bad: #c0341d;
+    --bad-soft: #fdeeeb;
+    --good: #0d7a4b;
+    --good-soft: #e5f5ec;
+    --accent: #3452d1;
+    --accent-soft: #e8ecfc;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d1015;
+      --surface: #151920;
+      --surface-2: #1c212a;
+      --text: #e7e9ed;
+      --muted: #98a1b0;
+      --border: #2a303b;
+      --bad: #ff806c;
+      --bad-soft: #351c18;
+      --good: #4fd08b;
+      --good-soft: #13301f;
+      --accent: #92a7ff;
+      --accent-soft: #1d2544;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 1240px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 28px; line-height: 1.2; margin: 0 0 8px; letter-spacing: -0.01em; }
+  h2 { font-size: 17px; margin: 0; }
+  h3 { font-size: 15px; margin: 0 0 8px; }
+  p { margin: 0; }
+  .lead { color: var(--muted); max-width: 760px; }
+  .lead strong { color: var(--text); }
+  code, .mono { font-family: var(--mono); font-size: 0.9em; }
+
+  button {
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    padding: 7px 12px;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--surface); font-weight: 600; }
+  button.ghost { background: transparent; }
+  input {
+    font: inherit;
+    color: inherit;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 10px;
+    width: 140px;
+  }
+
+  /* Controls */
+  .controls {
+    margin: 24px 0 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px 16px;
+    display: grid;
+    gap: 12px;
+  }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .group { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .group-label { color: var(--muted); font-size: 13px; margin-right: 2px; }
+  .spacer { flex: 1; }
+  .sep { width: 1px; align-self: stretch; background: var(--border); margin: 0 4px; }
+  .truth {
+    display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center;
+    font-size: 14px; padding-top: 10px; border-top: 1px solid var(--border);
+  }
+  .truth .label { color: var(--muted); }
+  .note { color: var(--muted); font-size: 14px; min-height: 21px; }
+  @media (max-width: 720px) { .sep { display: none; } }
+  .note.error { color: var(--bad); }
+
+  /* Clusters */
+  .clusters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 480px), 1fr));
+    gap: 16px;
+  }
+  .cluster {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: 4px solid var(--tone);
+    border-radius: 14px;
+    padding: 16px;
+    display: grid;
+    gap: 14px;
+    align-content: start;
+    min-width: 0;
+  }
+  .cluster[data-kind="stateful"] { --tone: var(--bad); --tone-soft: var(--bad-soft); }
+  .cluster[data-kind="stateless"] { --tone: var(--good); --tone-soft: var(--good-soft); }
+  .cluster-head { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+  .tag {
+    font-size: 12px; font-weight: 700; letter-spacing: 0.06em;
+    color: var(--tone); background: var(--tone-soft);
+    padding: 2px 8px; border-radius: 999px;
+  }
+  .cluster-sub { color: var(--muted); font-size: 14px; }
+
+  .verdict {
+    border-radius: 10px;
+    padding: 10px 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    min-height: 66px;
+  }
+  .verdict.ok { background: var(--good-soft); border-color: transparent; }
+  .verdict.bad { background: var(--bad-soft); border-color: transparent; }
+  .verdict .answer { font-weight: 600; }
+  .verdict .why { font-size: 14px; }
+  .verdict.ok .why { color: var(--good); }
+  .verdict.bad .why { color: var(--bad); }
+  .verdict.idle { color: var(--muted); display: flex; align-items: center; }
+  .score { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .score b { color: var(--text); }
+  .score b.good { color: var(--good); }
+  .score b.bad { color: var(--bad); }
+
+  /* Diagram */
+  .lb {
+    justify-self: center;
+    text-align: center;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    border-radius: 999px;
+    padding: 6px 16px;
+    font-size: 14px;
+  }
+  .lb .mono { color: var(--muted); }
+  .fan { text-align: center; color: var(--muted); font-size: 13px; line-height: 1; margin: -6px 0; }
+  .servers {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+    gap: 8px;
+  }
+  .server {
+    position: relative;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 10px 10px;
+    min-height: 118px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+  .server.hit {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-soft);
+    animation: pop 0.45s ease-out;
+  }
+  @keyframes pop { 0% { transform: scale(0.96); } 60% { transform: scale(1.03); } 100% { transform: scale(1); } }
+  @media (prefers-reduced-motion: reduce) { .server.hit { animation: none; } }
+  .server-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .server-head strong { font-size: 14px; }
+  .server .meta { font-size: 12px; color: var(--muted); }
+  .server .x {
+    border: none; background: transparent; padding: 0 4px; font-size: 18px; line-height: 1;
+    color: var(--muted);
+  }
+  .server .x:hover:not(:disabled) { color: var(--bad); }
+  .hit-tag {
+    margin-top: auto;
+    font-size: 11px; font-weight: 600; color: var(--accent);
+  }
+  .server.add {
+    align-items: center; justify-content: center;
+    border-style: dashed; color: var(--muted); background: transparent;
+  }
+  .server.add:hover:not(:disabled) { color: var(--accent); }
+  .mem-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-top: 2px; }
+  .mem { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+  .sess {
+    font-size: 13px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 2px 6px;
+    overflow-wrap: anywhere;
+  }
+  .sess.mine { border-color: var(--accent); }
+  .sess .you { font-weight: 700; color: var(--accent); }
+  .sess .other { color: var(--muted); }
+  .empty { font-size: 13px; color: var(--muted); font-style: italic; }
+
+  .store {
+    border: 1.5px dashed var(--tone);
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: grid;
+    gap: 6px;
+  }
+  .store.none { border-color: var(--border); color: var(--muted); font-size: 14px; }
+  .store-head { font-weight: 600; font-size: 14px; }
+  .store .mem { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+
+  /* Log */
+  .log { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+  .log li {
+    display: grid;
+    grid-template-columns: 30px minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: baseline;
+    font-size: 13px;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .log li:last-child { border-bottom: none; }
+  .log .n { color: var(--muted); font-family: var(--mono); }
+  .log .what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .log .res-ok { color: var(--good); font-weight: 600; }
+  .log .res-bad { color: var(--bad); font-weight: 600; }
+
+  /* Explanation */
+  .explain {
+    margin-top: 28px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+    gap: 16px;
+  }
+  .explain section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+  }
+  .explain ol, .explain ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 14px; }
+  .explain p { font-size: 14px; color: var(--muted); }
+  .explain p + p { margin-top: 8px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Stateless servers</h1>
+    <p class="lead">
+      Horizontal scaling works only when <strong>any server can handle any request</strong>.
+      Both clusters below run the same app code behind a round-robin load balancer.
+      The only difference is where a server keeps your session (who you are, what is in your cart).
+    </p>
+  </header>
+
+  <section class="controls" aria-label="Controls">
+    <div class="row">
+      <div class="group">
+        <span class="group-label">You</span>
+        <input id="name" value="Alice" maxlength="30" aria-label="Your name">
+        <button data-action="login">Log in</button>
+      </div>
+      <span class="sep" aria-hidden="true"></span>
+      <div class="group">
+        <span class="group-label">Shop</span>
+        <button data-action="add" data-item="phone">Add phone</button>
+        <button data-action="add" data-item="laptop">Add laptop</button>
+        <button data-action="add" data-item="headphones">Add headphones</button>
+        <button data-action="view">Open cart</button>
+      </div>
+      <span class="spacer"></span>
+      <div class="group">
+        <button class="primary" data-action="play">▶ Play the scenario</button>
+        <button class="ghost" data-action="reset">Reset</button>
+      </div>
+    </div>
+    <p class="note" id="note">Every click sends the same request to both clusters, so you can compare the answers.</p>
+    <div class="truth" id="truth"></div>
+  </section>
+
+  <div class="clusters">
+    <article class="cluster" data-kind="stateful" aria-labelledby="h-stateful">
+      <div class="cluster-head">
+        <span class="tag">STATEFUL</span>
+        <h2 id="h-stateful">Sessions in each server's own memory</h2>
+      </div>
+      <p class="cluster-sub">Server A, B and C each keep a private <code>Map</code> of sessions.</p>
+      <div id="stateful-verdict"></div>
+      <div id="stateful-diagram"></div>
+      <div>
+        <h3>Requests</h3>
+        <ol class="log" id="stateful-log"></ol>
+      </div>
+    </article>
+
+    <article class="cluster" data-kind="stateless" aria-labelledby="h-stateless">
+      <div class="cluster-head">
+        <span class="tag">STATELESS</span>
+        <h2 id="h-stateless">Sessions in one shared store</h2>
+      </div>
+      <p class="cluster-sub">Every server reads and writes sessions in the same store and remembers nothing itself.</p>
+      <div id="stateless-verdict"></div>
+      <div id="stateless-diagram"></div>
+      <div>
+        <h3>Requests</h3>
+        <ol class="log" id="stateless-log"></ol>
+      </div>
+    </article>
+  </div>
+
+  <div class="explain">
+    <section>
+      <h3>What is going on</h3>
+      <p>
+        <strong>State</strong> is data a server remembers between requests, like a login session or a shopping cart.
+        On the left, the server that handled “add phone” stores the cart in its own memory. The next request
+        goes to a different server, which has no cart for you, so you see an empty cart.
+      </p>
+      <p>
+        On the right, the cart lives in a shared store (Redis, or a small built-in stand-in). Every server reads
+        the same cart, so the load balancer can send any request to any server.
+      </p>
+    </section>
+    <section>
+      <h3>Things to try</h3>
+      <ol>
+        <li>Press <strong>▶ Play the scenario</strong>: add a phone, then open the cart three times.</li>
+        <li><strong>Log in</strong>, then press <strong>Open cart</strong> a few times. On the left you are logged in on one server only.</li>
+        <li>Stop (×) the server that holds your cart on the left. The cart is gone for good. Stop one on the right: nothing is lost.</li>
+        <li><strong>+ Add server</strong> on the right. It serves your cart immediately. On the left, the new server knows nobody.</li>
+      </ol>
+    </section>
+  </div>
+</main>
+
+<script>
+  const CLUSTERS = ['stateful', 'stateless'];
+  const LABEL = { phone: 'Phone', laptop: 'Laptop', headphones: 'Headphones' };
+  const NAME = { phone: 'phone', laptop: 'laptop', headphones: 'headphones' };
+  const LOG_SIZE = 8;
+
+  const state = {
+    you: { user: null, cart: [] }, // what the user actually did
+    sessionId: null,
+    last: { stateful: null, stateless: null },
+    log: { stateful: [], stateless: [] },
+    status: null,
+    busy: false,
+    requestNo: 0,
+    score: { stateful: { right: 0, wrong: 0 }, stateless: { right: 0, wrong: 0 } },
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (value) =>
+    String(value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const cartText = (cart) => (cart.length ? cart.map((i) => esc(LABEL[i] ?? i)).join(', ') : 'empty');
+  const userText = (user) => (user ? esc(user) : 'Guest');
+
+  // ── Talking to the server ────────────────────────────────────────────────
+  async function request(method, url, body) {
+    const res = await fetch(url, {
+      method,
+      headers: body ? { 'content-type': 'application/json' } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    let data = {};
+    try { data = await res.json(); } catch { /* not JSON */ }
+    if (!res.ok && !data.error) data.error = `HTTP ${res.status}`;
+    return { ok: res.ok, status: res.status, ...data };
+  }
+
+  /** Send the same app request to both clusters and record the answers. */
+  async function sendToBoth(kind, value) {
+    const [method, path, body, label] =
+      kind === 'login' ? ['POST', '/api/login', { name: value }, `log in as ${value}`]
+      : kind === 'add' ? ['POST', '/api/cart', { item: value }, `add ${NAME[value]}`]
+      : ['GET', '/api/cart', undefined, 'open cart'];
+
+    if (kind === 'login') state.you.user = value;
+    if (kind === 'add') state.you.cart.push(value);
+    const n = ++state.requestNo;
+
+    // One cluster after the other, not in parallel: on the very first request the
+    // first answer sets the session cookie, and the second request reuses it.
+    for (const cluster of CLUSTERS) {
+      const res = await request(method, `/${cluster}${path}`, body);
+      if (res.sessionId) state.sessionId = res.sessionId;
+      const entry = { n, method, path, label, ...res, verdict: judge(res) };
+      state.last[cluster] = entry;
+      state.log[cluster] = [entry, ...state.log[cluster]].slice(0, LOG_SIZE);
+      state.score[cluster][entry.verdict.ok ? 'right' : 'wrong']++;
+    }
+    await refreshStatus();
+  }
+
+  function judge(res) {
+    if (!res.ok) return { ok: false, text: res.error };
+    const sameUser = res.user === state.you.user;
+    const sameCart = res.cart.join() === state.you.cart.join();
+    if (sameUser && sameCart) return { ok: true, text: '✓ Matches what you did.' };
+    if (!res.sessionFound) {
+      return { ok: false, text: `✗ Server ${res.servedBy} has never seen your session, so it treats you as a new visitor.` };
+    }
+    return { ok: false, text: `✗ Server ${res.servedBy} only knows the requests that happened to land on server ${res.servedBy}.` };
+  }
+
+  async function refreshStatus() {
+    const res = await fetch('/admin/status');
+    if (!res.ok) throw new Error(`Status failed: HTTP ${res.status}`);
+    state.status = await res.json();
+    render();
+  }
+
+  // ── Actions ──────────────────────────────────────────────────────────────
+  async function run(task) {
+    if (state.busy) return;
+    state.busy = true;
+    render();
+    try {
+      await task();
+    } catch (err) {
+      note(`Something went wrong: ${err.message}. Is the demo still running?`, true);
+    } finally {
+      state.busy = false;
+      render();
+    }
+  }
+
+  async function reset() {
+    await request('POST', '/admin/reset');
+    state.you = { user: null, cart: [] };
+    state.sessionId = null;
+    state.last = { stateful: null, stateless: null };
+    state.log = { stateful: [], stateless: [] };
+    state.requestNo = 0;
+    state.score = { stateful: { right: 0, wrong: 0 }, stateless: { right: 0, wrong: 0 } };
+    await refreshStatus();
+  }
+
+  async function playScenario() {
+    note('Restarting all servers with empty memory…');
+    await reset();
+    const steps = [
+      ['add', 'phone', 'Step 1 of 4: the user adds a phone to the cart.'],
+      ['view', null, 'Step 2 of 4: the user opens the cart. The load balancer sends it to the next server.'],
+      ['view', null, 'Step 3 of 4: the user opens the cart again.'],
+      ['view', null, 'Step 4 of 4: once more. Round robin is back at server A.'],
+    ];
+    for (const [kind, value, text] of steps) {
+      note(text);
+      await sendToBoth(kind, value);
+      await sleep(1400);
+    }
+    const { stateful, stateless } = state.score;
+    note(`Left: ${stateful.wrong} of ${steps.length} answers were wrong, because the cart only existed on the server that stored it. `
+      + `Right: ${stateless.right} of ${steps.length} correct, every server read the same cart from the shared store.`);
+  }
+
+  async function changeServers(cluster, method, name) {
+    const path = name ? `/admin/${cluster}/servers/${encodeURIComponent(name)}` : `/admin/${cluster}/servers`;
+    const res = await request(method, path);
+    if (!res.ok) return note(res.error, true);
+    if (method === 'POST') note(`Started server ${res.name} and added it to the ${cluster} load balancer.`);
+    else note(`Stopped server ${name} in the ${cluster} cluster. Everything in its memory is gone.`);
+    await refreshStatus();
+  }
+
+  function note(text, isError = false) {
+    const el = $('note');
+    el.textContent = text;
+    el.classList.toggle('error', isError);
+  }
+
+  document.addEventListener('click', (event) => {
+    const button = event.target.closest('button');
+    if (!button || button.disabled) return;
+    const { action, item, add, remove } = button.dataset;
+
+    if (action === 'login') {
+      const name = $('name').value.trim().slice(0, 30);
+      if (!name) return note('Type a name first.', true);
+      run(async () => { note(`Logging in as ${name} on both clusters.`); await sendToBoth('login', name); });
+    } else if (action === 'add') {
+      run(async () => { note(`Adding a ${NAME[item]} on both clusters.`); await sendToBoth('add', item); });
+    } else if (action === 'view') {
+      run(async () => { note('Opening the cart on both clusters.'); await sendToBoth('view'); });
+    } else if (action === 'play') {
+      run(playScenario);
+    } else if (action === 'reset') {
+      run(async () => { note('Restarting all servers with empty memory…'); await reset(); note('Fresh start: 3 servers per cluster, no sessions anywhere.'); });
+    } else if (add) {
+      run(() => changeServers(add, 'POST'));
+    } else if (remove) {
+      const [cluster, name] = remove.split(':');
+      run(() => changeServers(cluster, 'DELETE', name));
+    }
+  });
+
+  $('name').addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') document.querySelector('[data-action="login"]').click();
+  });
+
+  // ── Rendering ────────────────────────────────────────────────────────────
+  function setHtml(id, html) {
+    const el = $(id);
+    if (el._html === html) return; // avoid re-rendering (and re-animating) unchanged parts
+    el._html = html;
+    el.innerHTML = html;
+  }
+
+  function render() {
+    const { user, cart } = state.you;
+    setHtml('truth', `
+      <span class="label">What you actually did:</span>
+      <span>User: <strong>${user ? esc(user) : 'not logged in'}</strong></span>
+      <span>Cart: <strong>${cartText(cart)}</strong></span>`);
+
+    for (const cluster of CLUSTERS) {
+      setHtml(`${cluster}-verdict`, renderVerdict(state.last[cluster], state.score[cluster]));
+      setHtml(`${cluster}-diagram`, renderDiagram(cluster));
+      setHtml(`${cluster}-log`, renderLog(state.log[cluster]));
+    }
+    // Set after rendering, so toggling "busy" does not rebuild (and re-animate) the diagrams.
+    document.querySelectorAll('button').forEach((b) => { b.disabled = state.busy; });
+  }
+
+  function renderVerdict(last, score) {
+    if (!last) return '<div class="verdict idle">No requests yet. Use the buttons above.</div>';
+    const tally = `
+      <div class="score">So far: <b class="good">${score.right}</b> correct · <b class="${score.wrong ? 'bad' : ''}">${score.wrong}</b> wrong</div>`;
+    if (!last.ok) {
+      return `<div class="verdict bad"><div class="answer">Request failed</div><div class="why">${esc(last.error)}</div>${tally}</div>`;
+    }
+    return `
+      <div class="verdict ${last.verdict.ok ? 'ok' : 'bad'}">
+        <div class="answer">Server ${esc(last.servedBy)} answered: user ${userText(last.user)}, cart: ${cartText(last.cart)}</div>
+        <div class="why">${esc(last.verdict.text)}</div>
+        ${tally}
+      </div>`;
+  }
+
+  function renderDiagram(cluster) {
+    const info = state.status?.[cluster];
+    if (!info) return '<p class="empty">Loading…</p>';
+    const lastServer = state.last[cluster]?.servedBy;
+    const stateless = cluster === 'stateless';
+
+    const servers = info.servers.map((s) => {
+      const memory = stateless
+        ? '<p class="empty">no user data</p>'
+        : s.sessions.length
+          ? `<ul class="mem">${s.sessions.map(renderSession).join('')}</ul>`
+          : '<p class="empty">empty</p>';
+      return `
+        <div class="server ${s.server === lastServer ? 'hit' : ''}">
+          <div class="server-head">
+            <strong>Server ${esc(s.server)}</strong>
+            <button class="x" data-remove="${cluster}:${esc(s.server)}" title="Stop server ${esc(s.server)}" aria-label="Stop server ${esc(s.server)}">×</button>
+          </div>
+          <div class="meta">${s.down ? 'not responding' : `pid ${esc(s.pid)} · ${esc(s.requestsHandled)} req`}</div>
+          <div class="mem-label">In its memory</div>
+          ${memory}
+          ${s.server === lastServer ? '<div class="hit-tag">● answered the last request</div>' : ''}
+        </div>`;
+    }).join('');
+
+    const store = stateless
+      ? `<div class="store">
+           <div class="store-head">Shared store · ${esc(state.status.sharedStore.label)}</div>
+           ${state.status.sharedStore.sessions.length
+             ? `<ul class="mem">${state.status.sharedStore.sessions.map(renderSession).join('')}</ul>`
+             : '<p class="empty">empty</p>'}
+         </div>`
+      : '<div class="store none">No shared store. Each server only knows about the requests it handled itself.</div>';
+
+    return `
+      <div style="display:grid; gap:12px">
+        <div class="lb">Load balancer · round robin <span class="mono">${esc(info.url)}</span></div>
+        <div class="fan" aria-hidden="true">↓ &nbsp; ↓ &nbsp; ↓</div>
+        <div class="servers">
+          ${servers}
+          <button class="server add" data-add="${cluster}">+ Add server</button>
+        </div>
+        ${stateless ? '<div class="fan" aria-hidden="true">↓ every server reads &amp; writes here ↓</div>' : ''}
+        ${store}
+      </div>`;
+  }
+
+  function renderSession(session) {
+    const mine = session.id === state.sessionId;
+    const who = mine ? '<span class="you">you</span>' : `<span class="other">visitor ${esc(session.id.slice(0, 4))}</span>`;
+    return `<li class="sess ${mine ? 'mine' : ''}" title="session ${esc(session.id)}">${who} · ${userText(session.user)} · ${cartText(session.cart)}</li>`;
+  }
+
+  function renderLog(entries) {
+    if (!entries.length) return '<li><span></span><span class="empty">nothing yet</span><span></span></li>';
+    return entries.map((e) => {
+      const result = e.ok
+        ? `server ${esc(e.servedBy)} → ${userText(e.user)}, cart: ${cartText(e.cart)}`
+        : esc(e.error);
+      return `
+        <li>
+          <span class="n">#${e.n}</span>
+          <span class="what"><span class="mono">${e.method}</span> ${esc(e.label)} · ${result}</span>
+          <span class="${e.verdict.ok ? 'res-ok' : 'res-bad'}">${e.verdict.ok ? '✓' : '✗'}</span>
+        </li>`;
+    }).join('');
+  }
+
+  // ── Start ────────────────────────────────────────────────────────────────
+  render();
+  refreshStatus().catch((err) => note(`Could not reach the demo: ${err.message}`, true));
+  setInterval(() => {
+    if (!state.busy && !document.hidden) refreshStatus().catch(() => {});
+  }, 2000);
+</script>
+</body>
+</html>

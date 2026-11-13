@@ -1,0 +1,27 @@
+{
+  "name": "stateless-servers-demo",
+  "version": "1.0.0",
+  "description": "Interactive demo of why horizontal scaling needs stateless servers: in-memory sessions vs. a shared store (Redis), side by side.",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "demo:cli": "node scripts/cli-demo.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18.17"
+  },
+  "keywords": [
+    "system-design",
+    "horizontal-scaling",
+    "stateless",
+    "load-balancer",
+    "redis",
+    "sessions"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "redis": "^4.7.1"
+  }
+}
